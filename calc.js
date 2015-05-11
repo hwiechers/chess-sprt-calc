@@ -16,17 +16,25 @@ var x = d3.scale.linear().domain([-3, 8]).range([0, width]);
 var xAxis = d3.svg.axis().scale(x).orient("bottom");
 
 var probScale = d3.scale.linear().domain([0, 1]).range([height, 0]);
-var numGameScale = d3.scale.linear().domain([0, 50000]).range([height, 0]);
+var probAxis = d3.svg.axis()
+    .scale(probScale)
+    .tickFormat(d3.format("0.1f"))
+    .orient("left");
 
-drawChart(d3.select('#pass-prob-chart'),
-          'Pass Probability', probScale, d3.format("0.1f"));
+var numGameScale = d3.scale.linear().domain([0, 50000]).range([height, 0]);
+var numGameAxis = d3.svg.axis()
+    .scale(numGameScale)
+    .tickFormat(function(d) { return d/1000 + 'k'; })
+    .orient("left");
+
+drawChart(d3.select('#pass-prob-chart'), 'Pass Probability', probAxis);
 drawChart(d3.select('#num-games-chart'),
-          'Expected Number of Games', numGameScale,
-          function(d) { return d/1000 + 'k'; });
+    'Expected Number of Games',
+    numGameAxis);
 
 displayData();
 
-function drawChart(chart, yLabel, yScale, yFormat) {
+function drawChart(chart, yLabel, yAxis) {
     chart.attr("width", width + margin.left + margin.right)
          .attr("height", height + margin.top + margin.bottom)
 
@@ -38,8 +46,6 @@ function drawChart(chart, yLabel, yScale, yFormat) {
         .attr("class", "x axis")
         .attr("transform", "translate(0," + height + ")")
         .call(xAxis);
-
-    var yAxis = d3.svg.axis().scale(yScale).tickFormat(yFormat).orient("left");
 
     plotAreas.append("g")
         .attr("class", "y axis")
@@ -80,15 +86,24 @@ function displayData() {
     var sprt = new Sprt(0.05, 0.05, bayesElo0, bayesElo1, drawElo);
 
     var data = [];
+    var numGameBound = 0;
     for (var elo = -3; elo <= 8; elo += 0.5) {
         var bayesElo = elo / scale(drawElo);
+        var expNumGames = sprt.characteristics(bayesElo)[1];
         data.push({ 
             elo: elo,
             bayesElo: bayesElo,
             passProb: sprt.characteristics(bayesElo)[0],
-            expNumGames: sprt.characteristics(bayesElo)[1]
+            expNumGames: expNumGames
         });
+        numGameBound = Math.max(numGameBound, expNumGames);
     }
+
+    numGameBound = 10000 * Math.ceil(numGameBound / 10000);
+    numGameBound = Math.max(50000, numGameBound);
+
+    numGameScale.domain([0, numGameBound]);
+    d3.select('#num-games-chart g.y.axis').call(numGameAxis);
 
     plotLine(d3.select("#pass-prob-chart .plot-area"), data,
              function(d) { return probScale(d.passProb); });
