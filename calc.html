@@ -30,10 +30,39 @@
               shape-rendering: crispEdges;
             }
 
+            .grid-background {
+              fill: #ddd;
+            }
+
+            .grid line {
+              stroke: #fff;
+              stroke-width: 1px;
+              shape-rendering: crispEdges;
+            }
+
+            .grid .minor {
+              stroke-opacity: 0.25;
+            }
+
+            .grid text {
+              display: none;
+            }
+
+            .grid path,
+            .axis path {
+              display: none;
+            }
+
             .form-control.number {
               width: 4em;
               text-align: right;
               margin-right: 0.5em;
+            }
+
+            .chart-tooltip circle {
+                fill: white;
+                stroke: black;
+                stroke-width: 2px;
             }
 
         </style>
@@ -57,17 +86,6 @@
                     <input class='btn btn-default' type=submit name=calulate value=Calculate>
             </form>
             <hr>
-            <table id='table' class='table table-striped' style='width: auto; float: left;'>
-                <thead>
-                    <tr>
-                        <th>Elo</th>
-                        <th>Bayes Elo</th>
-                        <th>Pass Prob</th>
-                        <th>Exp Num Games</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
             <svg id=pass-prob-chart style='float: left;'></svg>
             <svg id=num-games-chart style='float: left;'></svg>
         </div>

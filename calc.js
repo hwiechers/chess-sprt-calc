@@ -1,6 +1,6 @@
 function loadInput(name, defaultValue) {
     var value = url('?' + name);
-    var input = document.getElementById(name)
+    var input = document.getElementById(name);
     input.value = value !== null ? value : defaultValue;
 }
 
@@ -8,54 +8,157 @@ loadInput('bayes-elo-0', '-1.5');
 loadInput('bayes-elo-1', '4.5');
 loadInput('draw-elo', '250');
 
-var margin = {top: 10, right: 10, bottom: 80, left: 80};
-var width = 640 - margin.left - margin.right;
+var data = [];
+
+var bayesElo0 = null;
+var bayesElo1 = null;
+var drawElo = null;
+
+var eloStart = null;
+var eloEnd = null;
+
+var passProbChart = d3.select('#pass-prob-chart');
+var numGamesChart = d3.select('#num-games-chart');
+
+var margin = {top: 10, right: 50, bottom: 60, left: 60};
+var width = 570 - margin.left - margin.right;
 var height = 480 - margin.top - margin.bottom;
 
-var x = d3.scale.linear().domain([-3, 8]).range([0, width]);
-var xAxis = d3.svg.axis().scale(x).orient("bottom");
-
+var x = d3.scale.linear().range([0, width]);
 var probScale = d3.scale.linear().domain([0, 1]).range([height, 0]);
+var numGameScale = d3.scale.linear().range([height, 0]);
+
+
+buildChart(passProbChart, 'Pass Probability');
+buildChart(numGamesChart, 'Expected Number of Games');
+
+function applyAxis(selector, axis) {
+    var orientation = axis.orient();
+    var axisType = orientation == "bottom" ? "x" : "y";
+
+    d3.select(selector + " .plot-area ." + axisType + ".axis").call(axis);
+    drawGridTicks(selector, axisType, axis.scale());
+}
+
+function drawGridTicks(selector, axisType, scale) {
+    var ticks = scale.ticks(5);
+    var minorTicks = [];
+    for (var i = 0; i < ticks.length - 1; i++) {
+        minorTicks.push((ticks[i] + ticks[i+1]) / 2);
+    }
+
+    ticks = ticks.concat(minorTicks);
+    ticks.sort(function(a, b) { return a - b; });
+
+    var g = d3.select(selector + " .grid ." + axisType);
+
+    var selection = g.selectAll("line").data(ticks, function(d) { return d; });
+    selection.exit().remove();
+    selection.enter().append("line");
+    selection
+        .classed("minor", function(d, i) { return i % 2 })
+        .attr("x1", function(d) { return axisType == "x" ? scale(d) : 0 })
+        .attr("y1", function(d) { return axisType == "x" ? 0 : scale(d) })
+        .attr("x2", function(d) { return axisType == "x" ? scale(d) : width })
+        .attr("y2", function(d) { return axisType == "x" ? height : scale(d)});
+}
+
 var probAxis = d3.svg.axis()
     .scale(probScale)
     .tickFormat(d3.format("0.1f"))
+    .ticks(5)
     .orient("left");
 
-var numGameScale = d3.scale.linear().domain([0, 50000]).range([height, 0]);
-var numGameAxis = d3.svg.axis()
-    .scale(numGameScale)
-    .tickFormat(function(d) { return d/1000 + 'k'; })
-    .orient("left");
-
-drawChart(d3.select('#pass-prob-chart'), 'Pass Probability', probAxis);
-drawChart(d3.select('#num-games-chart'),
-    'Expected Number of Games',
-    numGameAxis);
+applyAxis("#pass-prob-chart", probAxis);
 
 displayData();
 
-function drawChart(chart, yLabel, yAxis) {
-    chart.attr("width", width + margin.left + margin.right)
-         .attr("height", height + margin.top + margin.bottom)
+function showTooltips() {
+    d3.selectAll(".chart-tooltip").style("display", null);
+}
 
-    var plotAreas = chart.append("g")
+function hideTooltips() {
+    d3.selectAll(".chart-tooltip").style("display", "none");
+}
+
+function updateTooltips() {
+    var x0 = x.invert(d3.mouse(this)[0]);
+    var i = Math.round((x0 - eloStart) * 10);
+    var d = data[i];
+
+    var tooltip = passProbChart.select(".chart-tooltip");
+
+    tooltip.select("circle")
+        .attr("transform", "translate(" + x(d.elo) + "," + probScale(d.passProb) + ")");
+    tooltip.select("text")
+        .attr("transform", "translate(" + x(d.elo) + "," + probScale(d.passProb) + ")")
+        .text("(" + d.elo + ", " + d3.format("0.2f")(d.passProb) + ")" );
+
+    tooltip = numGamesChart.select(".chart-tooltip");
+
+    tooltip.select("circle")
+        .attr("transform", "translate(" + x(d.elo) + "," + numGameScale(d.expNumGames) + ")");
+    tooltip.select("text")
+        .attr("transform", "translate(" + x(d.elo) + "," + numGameScale(d.expNumGames) + ")")
+        .text("(" + d.elo + ", " + d3.format("0.1f")(d.expNumGames / 1000.0) + "k)" );
+}
+
+function buildChart(chart, yLabel) {
+    chart.attr("width", width + margin.left + margin.right)
+         .attr("height", height + margin.top + margin.bottom);
+
+    var grid = chart.append("g")
+        .attr("class", "grid")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    grid.append("g")
+        .attr("class", "grid-background")
+        .append("rect")
+        .attr("width", width)
+        .attr("height", height);
+
+    grid.append("g")
+        .attr("class", "x grid");
+
+    grid.append("g")
+        .attr("class", "y grid");
+
+    var plotArea = chart.append("g")
         .attr("class", "plot-area")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    plotAreas.append("g")
+    plotArea.append("g")
         .attr("class", "x axis")
-        .attr("transform", "translate(0," + height + ")")
-        .call(xAxis);
+        .attr("transform", "translate(0," + height + ")");
 
-    plotAreas.append("g")
-        .attr("class", "y axis")
-        .call(yAxis);
+    plotArea.append("g")
+        .attr("class", "y axis");
 
-    plotAreas.append("path")
-        .attr("class", "line")
+    plotArea.append("path")
+        .attr("class", "line");
 
     drawXAxisLabel(chart, 'Elo');
     drawYAxisLabel(chart, yLabel);
+
+    var tooltip = plotArea.append("g")
+        .attr("class", "chart-tooltip")
+        .style("display", "none");
+
+    tooltip.append("circle").attr("r", 3);
+    tooltip.append("text").attr("dy", 15).attr("dx", 5)
+        .style("fill", "black")
+        .style("stroke", "none")
+        .style("font", "10px sans-serif");
+
+    plotArea.append("rect")
+        .attr("width", width)
+        .attr("height", height)
+        .style("fill", "none") //style in css
+        .style("pointer-events", "all")
+        .on("mouseover", showTooltips)
+        .on("mouseout", hideTooltips)
+        .on("mousemove", updateTooltips);
+
 }
 
 function drawXAxisLabel(chart, text) {
@@ -77,17 +180,34 @@ function drawYAxisLabel(chart, text) {
         .text(text);
 }
 
+function setArgs() {
+    bayesElo0 = parseFloat(document.getElementById('bayes-elo-0').value),
+    bayesElo1 = parseFloat(document.getElementById('bayes-elo-1').value),
+    drawElo = parseFloat(document.getElementById('draw-elo').value)
+}
+
+function setEloDomain() {
+    var d = bayesElo1 - bayesElo0;
+    eloStart = Math.floor(bayesElo0 - d / 3);
+    eloEnd = Math.ceil(bayesElo1 + d / 3);
+}
+
 function displayData() {
+    setArgs();
+    setEloDomain();
 
-    var bayesElo0 = parseFloat(document.getElementById('bayes-elo-0').value);
-    var bayesElo1 = parseFloat(document.getElementById('bayes-elo-1').value);
-    var drawElo = parseFloat(document.getElementById('draw-elo').value);
+    x.domain([eloStart, eloEnd]);
+    var xAxis = d3.svg.axis().scale(x).ticks(5).orient("bottom");
 
+    applyAxis("#pass-prob-chart", xAxis);
+    applyAxis("#num-games-chart", xAxis);
+
+    data.length = 0;
     var sprt = new Sprt(0.05, 0.05, bayesElo0, bayesElo1, drawElo);
 
-    var data = [];
     var numGameBound = 0;
-    for (var elo = -3; elo <= 8; elo += 0.5) {
+    for (var i = eloStart * 10; i <= eloEnd * 10; i += 1) {
+        var elo = i / 10;
         var bayesElo = elo / scale(drawElo);
         var expNumGames = sprt.characteristics(bayesElo)[1];
         data.push({ 
@@ -100,52 +220,32 @@ function displayData() {
     }
 
     numGameBound = 10000 * Math.ceil(numGameBound / 10000);
-    numGameBound = Math.max(50000, numGameBound);
 
     numGameScale.domain([0, numGameBound]);
-    d3.select('#num-games-chart g.y.axis').call(numGameAxis);
+
+    var numGameAxis = d3.svg.axis()
+        .scale(numGameScale)
+        .ticks(5)
+        .tickFormat(function(d) { return d/1000 + 'k'; })
+        .orient("left");
+
+    applyAxis("#num-games-chart", numGameAxis);
+
+    var lineX = function(d) { return x(d.elo); }
 
     plotLine(d3.select("#pass-prob-chart .plot-area"), data,
-             function(d) { return probScale(d.passProb); });
+            lineX, function(d) { return probScale(d.passProb); });
     plotLine(d3.select("#num-games-chart .plot-area"), data,
-             function(d) { return numGameScale(d.expNumGames); });
-    fillTable(d3.select("#table tbody"), data);
+            lineX, function(d) { return numGameScale(d.expNumGames); });
 }
 
-function plotLine(plotArea, data, y) {
+function plotLine(plotArea, data, x, y) {
     var line = d3.svg.line()
                      .interpolate("cardinal")
-                     .x(function(d) { return x(d.elo); })
+                     .x(x)
                      .y(y);
 
     plotArea.datum(data).select(".line").attr("d", line);
-
-    var points = plotArea.selectAll("circle.point").data(data);
-    points.exit().remove();
-    points.enter().append("circle").attr("class", "point");
-    points.attr("cx", function(d) { return x(d.elo); })
-          .attr("cy", y)
-          .attr("r", "2");
-}
-
-function fillTable(tbody, data) {
-    var eloFormat = d3.format(".2f");
-    var probFormat = d3.format("0.4f");
-    var numFormat = d3.format("0f");
-
-    var rows = tbody.selectAll("tr").data(data);
-    rows.exit().remove();
-    rows.enter().append("tr").html(
-        "<td class=elo></td>" +
-        "<td class=belo></td>" +
-        "<td class=pass-prob></td>" + 
-        "<td class=exp-num-games></td>");
-    rows.select("td.elo").text(function(d) { return eloFormat(d.elo); });
-    rows.select("td.belo").text(function(d) { return eloFormat(d.bayesElo); });
-    rows.select("td.pass-prob")
-        .text(function(d) { return probFormat(d.passProb); });
-    rows.select("td.exp-num-games")
-        .text(function(d) { return numFormat(d.expNumGames); });
 }
 
 document.getElementById('parameters').addEventListener('submit', function (e) {
