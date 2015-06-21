@@ -56,11 +56,11 @@ function drawGridTicks(selector, axisType, scale) {
     selection.exit().remove();
     selection.enter().append("line");
     selection
-        .classed("minor", function(d, i) { return i % 2 })
-        .attr("x1", function(d) { return axisType == "x" ? scale(d) : 0 })
-        .attr("y1", function(d) { return axisType == "x" ? 0 : scale(d) })
-        .attr("x2", function(d) { return axisType == "x" ? scale(d) : width })
-        .attr("y2", function(d) { return axisType == "x" ? height : scale(d)});
+        .classed("minor", function(d, i) { return i % 2; })
+        .attr("x1", function(d) { return axisType == "x" ? scale(d) : 0; })
+        .attr("y1", function(d) { return axisType == "x" ? 0 : scale(d); })
+        .attr("x2", function(d) { return axisType == "x" ? scale(d) : width; })
+        .attr("y2", function(d) { return axisType == "x" ? height : scale(d); });
 }
 
 var probAxis = d3.svg.axis()
@@ -181,9 +181,9 @@ function drawYAxisLabel(chart, text) {
 }
 
 function setArgs() {
-    bayesElo0 = parseFloat(document.getElementById('bayes-elo-0').value),
-    bayesElo1 = parseFloat(document.getElementById('bayes-elo-1').value),
-    drawElo = parseFloat(document.getElementById('draw-elo').value)
+    bayesElo0 = parseFloat(document.getElementById('bayes-elo-0').value);
+    bayesElo1 = parseFloat(document.getElementById('bayes-elo-1').value);
+    drawElo = parseFloat(document.getElementById('draw-elo').value);
 }
 
 function setEloDomain() {
@@ -231,7 +231,7 @@ function displayData() {
 
     applyAxis("#num-games-chart", numGameAxis);
 
-    var lineX = function(d) { return x(d.elo); }
+    var lineX = function(d) { return x(d.elo); };
 
     plotLine(d3.select("#pass-prob-chart .plot-area"), data,
             lineX, function(d) { return probScale(d.passProb); });
